@@ -205,7 +205,11 @@ class MURADataModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == 'fit' or stage is None:
-            train_val_dataset = MURADataset(self.data_dir, 'train_labeled_studies.csv', study_level=self.study_level, transform=self.train_transform)
+            train_val_dataset = MURADataset(self.data_dir,
+                                            'train_labeled_studies.csv',
+                                            study_level=self.study_level,
+                                            transform=self.train_transform,
+                                            )
 
             train_len = int(len(train_val_dataset)*0.9)
             self.train_dataset, self.val_dataset = random_split(train_val_dataset, [train_len, len(train_val_dataset)-train_len])
@@ -217,16 +221,35 @@ class MURADataModule(LightningDataModule):
                 self.train_dataset, _ = random_split(self.train_dataset, [train_size, ignore_size])
 
         if stage == 'test' or stage is None:
-            self.test_dataset = MURADataset(self.data_dir, 'valid_labeled_studies.csv', study_level=self.study_level, transform=self.test_transform)
+            self.test_dataset = MURADataset(self.data_dir,
+                                            'valid_labeled_studies.csv',
+                                            study_level=True,
+                                            transform=self.test_transform,
+                                            )
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True,
-                                           num_workers=self.num_workers, pin_memory=True, collate_fn=self.collate_fn)
+        return torch.utils.data.DataLoader(self.train_dataset,
+                                           batch_size=self.batch_size,
+                                           shuffle=True,
+                                           num_workers=self.num_workers,
+                                           pin_memory=True,
+                                           collate_fn=self.collate_fn,
+                                           )
 
     def val_dataloader(self):
-        return torch.utils.data.DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False,
-                                           num_workers=self.num_workers, pin_memory=True, collate_fn=self.collate_fn)
+        return torch.utils.data.DataLoader(self.val_dataset,
+                                           batch_size=self.batch_size,
+                                           shuffle=False,
+                                           num_workers=self.num_workers,
+                                           pin_memory=True,
+                                           collate_fn=self.collate_fn,
+                                           )
 
     def test_dataloader(self):
-        return torch.utils.data.DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False,
-                                           num_workers=self.num_workers, pin_memory=True, collate_fn=self.collate_fn)
+        return torch.utils.data.DataLoader(self.test_dataset,
+                                           batch_size=self.batch_size,
+                                           shuffle=False,
+                                           num_workers=self.num_workers,
+                                           pin_memory=True,
+                                           collate_fn=MURAStudyCollator(12),
+                                           )
