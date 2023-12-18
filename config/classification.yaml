@@ -18,4 +18,4 @@ weight_decay: 1e-6
 freeze_encoder: -1
 
 project_name: vlp_classification_benchmark
-experiment_name: vlp_classification_benchmark
+experiment_name: ${hydra:runtime.choices.vision_model}-linear
