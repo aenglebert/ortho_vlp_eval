@@ -1,7 +1,7 @@
 
 defaults:
   - dataset: mura_224
-  - vision_model: vitxrs_attnpool
+  - vision_model: vit_b16_224_dr_bert
   - _self_
 
 seed: 12345
