@@ -4,6 +4,7 @@ _args_:
   - ${batch_size}
 num_workers: ${num_workers}
 study_level: false
+train_ratio: ${eval_type.train_ratio}
 train_transform:
   _target_: albumentations.Compose
   _args_:

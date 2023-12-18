@@ -2,6 +2,7 @@
 defaults:
   - dataset: mura_224
   - vision_model: vit_b16_224_dr_bert
+  - eval_type: linear
   - _self_
 
 seed: 12345
@@ -15,7 +16,7 @@ classifier_dropout: 0.5
 pool_image: True
 learning_rate: 1e-4
 weight_decay: 1e-6
-freeze_encoder: -1
+freeze_encoder: ${eval_type.freeze_encoder}
 
 project_name: vlp_classification_benchmark
-experiment_name: ${hydra:runtime.choices.vision_model}-linear
+experiment_name: ${hydra:runtime.choices.vision_model}-${hydra:runtime.choices.eval_type}
