@@ -1,3 +1,6 @@
+import numpy as np
+
+import albumentations as A
 from torch.utils.data import Dataset, random_split
 from pytorch_lightning import LightningDataModule
 import pandas as pd
@@ -36,7 +39,7 @@ class MURAStudyCollator:
             idx_x += size
 
         # convert labels to tensor
-        labels = torch.tensor(labels)
+        labels = torch.tensor(labels, dtype=torch.float)
 
         return {
             "images": images,
@@ -137,7 +140,12 @@ class MURADataset(Dataset):
 
                 # transform is needed
                 if self.transform is not None:
-                    image = self.transform(image)
+                    # if Albumenations, convert to numpy array
+                    if isinstance(self.transform, A.Compose):
+                        image = np.array(image)
+                        image = self.transform(image=image)['image']
+                    else:
+                        image = self.transform(image)
 
                 # append to list of images
                 study_images.append(image)
@@ -153,7 +161,12 @@ class MURADataset(Dataset):
 
             # transform if needed
             if self.transform is not None:
-                image = self.transform(image)
+                # if Albumenations, convert to numpy array
+                if isinstance(self.transform, A.Compose):
+                    image = np.array(image)
+                    image = self.transform(image=image)['image']
+                else:
+                    image = self.transform(image)
 
             # get image label and return with image
             label = self.images_label[index]
@@ -179,6 +192,7 @@ class MURADataModule(LightningDataModule):
         self.train_transform = train_transform
         self.test_transform = test_transform
         self.num_workers = num_workers
+        self.n_classes = 1
 
         if study_level:
             #self.collate_fn = StudyCollator(8)
