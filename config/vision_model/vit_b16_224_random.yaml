@@ -1,0 +1,5 @@
+_target_: transformers.ViTModel
+_args_:
+  - _target_: transformers.ViTConfig.from_pretrained
+    _args_:
+      - "google/vit-base-patch16-224"

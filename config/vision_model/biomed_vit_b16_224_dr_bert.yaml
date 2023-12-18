@@ -1,0 +1,4 @@
+_target_: transformers.AutoModel.from_pretrained
+_args_:
+  - "./checkpoints/biomed_vit_b16_224_DrBERT/vision_encoder"
+trust_remote_code: True

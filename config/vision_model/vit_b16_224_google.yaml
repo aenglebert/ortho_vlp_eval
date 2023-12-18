@@ -1,0 +1,4 @@
+_target_: transformers.AutoModel.from_pretrained
+_args_:
+  - "google/vit-base-patch16-224"
+trust_remote_code: True
