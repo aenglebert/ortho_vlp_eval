@@ -7,9 +7,12 @@ study_level: False
 train_transform:
   _target_: albumentations.Compose
   _args_:
-    - - _target_: albumentations.Resize
-        height: 448
-        width: 448
+    - - _target_: albumentations.LongestMaxSize
+        max_size: 448
+      - _target_: albumentations.PadIfNeeded
+        min_height: 448
+        min_width: 448
+        border_mode: 0
       - _target_: albumentations.Normalize
         mean:
           - 0.5
