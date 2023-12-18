@@ -48,6 +48,20 @@ class MURAStudyCollator:
         }
 
 
+class MURAImageCollator:
+    def __init__(self):
+        pass
+
+    def __call__(self, batch):
+        images = torch.stack([image for image, _ in batch], 0)
+        labels = torch.tensor([label for _, label in batch], dtype=torch.float)
+
+        return {
+            "images": images,
+            "labels": labels
+        }
+
+
 class MURADataset(Dataset):
     def __init__(self, data_dir, csv_file, transform=None, study_level=False):
         """
@@ -198,7 +212,7 @@ class MURADataModule(LightningDataModule):
             #self.collate_fn = StudyCollator(8)
             self.collate_fn = MURAStudyCollator(8)
         else:
-            self.collate_fn = None
+            self.collate_fn = MURAImageCollator()
 
     def prepare_data(self):
         pass
