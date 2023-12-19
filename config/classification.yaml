@@ -2,7 +2,7 @@
 defaults:
   - dataset: mura_224
   - vision_model: vit_b16_224_dr_bert
-  - eval_type: linear
+  - eval_type: linear_all
   - _self_
 
 seed: 12345

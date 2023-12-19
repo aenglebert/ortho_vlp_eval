@@ -1,0 +1,2 @@
+train_ratio: 0.01
+freeze_encoder: -1
