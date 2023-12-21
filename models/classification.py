@@ -9,15 +9,11 @@ from pytorch_lightning import LightningModule
 from sklearn.metrics import roc_auc_score
 
 
-class BinaryAUROCConfidenceInterval:
+class BinaryAUROC:
     """
-    Compute the auroc and the confidence interval of the AUROC by using the bootstrap method
+    Compute the auroc
     """
-    def __init__(self,
-                 confidence_interval=0.95,
-                 ):
-
-        self.confidence_interval = confidence_interval
+    def __init__(self):
 
         self.preds = []
         self.target = []
@@ -47,43 +43,13 @@ class BinaryAUROCConfidenceInterval:
         target = torch.cat(self.target, dim=0)
 
         # Compute the auroc with confidence interval
-        auroc, auroc_ic_low, auroc_ic_up = self.compute_auroc(preds, target)
+        auroc = roc_auc_score(target, preds)
 
         if not keep:
             self.preds = []
             self.target = []
 
-        return auroc, auroc_ic_low, auroc_ic_up
-
-    def compute_auroc(self, preds, target):
-        """
-        Compute the confidence interval using a bootraping method
-        :param preds: predictions
-        :param target: target
-        :return:
-        """
-
-        auroc_list = []
-
-        for i in range(1000):
-            # Sample with replacement
-            sample_idx = np.random.choice(range(len(preds)), len(preds), replace=True)
-            preds_sample = preds[sample_idx]
-            target_sample = target[sample_idx]
-
-            # Compute the AUROC
-            auroc = roc_auc_score(target_sample, preds_sample, multi_class="ovr", average="weighted")
-
-            # Store the AUROC
-            auroc_list.append(auroc)
-
-        # Compute the confidence interval
-        auroc_list = np.array(auroc_list)
-        auroc_ic_low = np.quantile(auroc_list, (1 - self.confidence_interval) / 2)
-        auroc_ic_up = np.quantile(auroc_list, 1 - (1 - self.confidence_interval) / 2)
-        auroc = np.median(auroc_list)
-
-        return auroc, auroc_ic_low, auroc_ic_up
+        return auroc
 
 
 # define the LightningModule
@@ -131,8 +97,8 @@ class ClassificationEncoder(LightningModule):
         self.train_acc = torchmetrics.Accuracy(task=task)
         self.val_acc = torchmetrics.Accuracy(task=task)
         self.test_acc = torchmetrics.Accuracy(task=task)
-        self.val_auroc = BinaryAUROCConfidenceInterval()
-        self.test_auroc = BinaryAUROCConfidenceInterval()
+        self.val_auroc = BinaryAUROC()
+        self.test_auroc = BinaryAUROC()
 
         self.freeze_encoder = freeze_encoder
 
@@ -202,10 +168,8 @@ class ClassificationEncoder(LightningModule):
         return loss
 
     def on_validation_epoch_end(self):
-        auroc, auroc_ic_low, auroc_ic_up = self.val_auroc.compute()
+        auroc = self.val_auroc.compute()
         self.log('val/auroc_epoch', auroc)
-        self.log('val/auroc_epoch_ic_low', auroc_ic_low)
-        self.log('val/auroc_epoch_ic_up', auroc_ic_up)
         self.log('val/acc_epoch', self.val_acc.compute())
 
     def test_step(self, batch, batch_idx):
@@ -227,10 +191,8 @@ class ClassificationEncoder(LightningModule):
         return loss
 
     def on_test_epoch_end(self):
-        auroc, auroc_ic_low, auroc_ic_up = self.test_auroc.compute()
+        auroc = self.test_auroc.compute()
         self.log('test/auroc_epoch', auroc)
-        self.log('test/auroc_epoch_ic_low', auroc_ic_low)
-        self.log('test/auroc_epoch_ic_up', auroc_ic_up)
         self.log('test/acc_epoch', self.test_acc.compute())
 
     def configure_optimizers(self):
