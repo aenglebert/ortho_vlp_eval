@@ -63,7 +63,8 @@ def main(cfg: DictConfig):
                                        n_classes=datamodule.n_classes,
                                        pool_image=cfg.pool_image,
                                        dropout=cfg.classifier_dropout,
-                                       lr=cfg.learning_rate,
+                                       classifier_learning_rate=cfg.classifier_learning_rate,
+                                       encoder_learning_rate=cfg.encoder_learning_rate,
                                        freeze_encoder=cfg.freeze_encoder,
                                        weight_decay=cfg.weight_decay,
                                        )

@@ -94,7 +94,8 @@ class ClassificationEncoder(LightningModule):
                  pool_image=False,
                  freeze_encoder=0,
                  dropout=0.2,
-                 lr=1e-4,
+                 classifier_learning_rate=1e-4,
+                 encoder_learning_rate=1e-6,
                  weight_decay=1e-6,
                  ):
         """
@@ -103,7 +104,8 @@ class ClassificationEncoder(LightningModule):
         :param n_classes: number of classes to predict
         :param pool_image: whether to pool the images or not if not performed by the encoder
         :param freeze_encoder: number of steps with the encoder frozen (-1 to freeze forever)
-        :param lr: learning rate
+        :param classifier_learning_rate: learning rate for the linear layer
+        :param encoder_learning_rate: learning rate for the encoder
         """
         super().__init__()
 
@@ -232,9 +234,18 @@ class ClassificationEncoder(LightningModule):
         self.log('test/acc_epoch', self.test_acc.compute())
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+
         if self.freeze_encoder != 0:
+            optimizer = torch.optim.AdamW(self.parameters(),
+                                          lr=self.hparams.classifier_learning_rate,
+                                          weight_decay=self.hparams.weight_decay,
+                                          )
             self.vision_model.requires_grad_(False)
+        else:
+            optimizer = torch.optim.AdamW(self.parameters(),
+                                          lr=self.hparams.encoder_learning_rate,
+                                          weight_decay=self.hparams.weight_decay,
+                                          )
 
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                                mode='min',
@@ -252,3 +263,6 @@ class ClassificationEncoder(LightningModule):
             self.vision_model.requires_grad_(True)
             self.freeze_encoder = 0
 
+            # Set the learning rate to the encoder learning rate
+            for param_group in self.optimizers().param_groups:
+                param_group['lr'] = self.hparams.encoder_learning_rate
