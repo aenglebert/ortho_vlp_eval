@@ -90,6 +90,7 @@ def main(cfg: DictConfig):
         logger=wandb_logger,
         callbacks=callbacks,
         accelerator=cfg.accelerator,
+        accumulate_grad_batches=cfg.accumulate_grad_batches,
     )
 
     # Train the classifier
