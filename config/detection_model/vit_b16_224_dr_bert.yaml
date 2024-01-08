@@ -1,0 +1,11 @@
+_target_: models.detection.Detection
+_args_:
+  - _target_: models.owlvit.XRSOwlViTForObjectDetection
+    vision_model:
+      _target_: models.modeling_vitxrs.ViTXRSModel.from_pretrained
+      _args_:
+        - "./checkpoints/vit_b16_224_DrBERT/vision_encoder"
+    text_model:
+      _target_: models.modeling_proj_camembert.ProjCamembertModel.from_pretrained
+      _args_:
+        - "./checkpoints/vit_b16_224_DrBERT/text_encoder"
