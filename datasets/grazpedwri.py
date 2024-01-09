@@ -13,12 +13,12 @@ from pytorch_lightning import LightningDataModule
 
 class GRAZPEDWRICollate:
     def __init__(self,
-                 tokenizer,
                  classname_list,
+                 tokenizer=None,
                  ):
         self.classname_list = classname_list
         # Append the no-class token
-        self.classname_list.append("")
+        # self.classname_list.append("")
         self.tokenizer = tokenizer
 
     def __call__(self,
@@ -27,7 +27,8 @@ class GRAZPEDWRICollate:
         batch_size = len(batch)
         images = torch.stack([batch_item["image"] for batch_item in batch])
         class_text = list(self.classname_list) * batch_size
-        class_tokenized = self.tokenizer(class_text, padding=True, return_tensors='pt')
+        if self.tokenizer is not None:
+            class_tokenized = self.tokenizer(class_text, padding=True, return_tensors='pt')
 
         labels = []
         for batch_item in batch:
@@ -36,8 +37,8 @@ class GRAZPEDWRICollate:
                            })
 
         return {"pixel_values": images,
-                "input_ids": class_tokenized["input_ids"],
-                "attention_mask": class_tokenized["attention_mask"],
+                "input_ids": class_tokenized["input_ids"] if self.tokenizer is not None else None,
+                "attention_mask": class_tokenized["attention_mask"] if self.tokenizer is not None else None,
                 "labels": labels,
                 }
 
