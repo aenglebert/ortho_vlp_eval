@@ -62,6 +62,13 @@ class ClassificationGRAZPEDWRIDataset(Dataset):
 
         self.transform = transform
 
+        self.pos_weight = torch.tensor([
+            (len(self.images_df) - self.images_df.cast.sum()) / len(self.images_df),
+            (len(self.images_df) - self.images_df.osteopenia.sum()) / len(self.images_df),
+            (len(self.images_df) - self.images_df.fracture_visible.sum()) / len(self.images_df),
+            (len(self.images_df) - self.images_df.metal.sum()) / len(self.images_df),
+            ], dtype=torch.float32)
+
     def __len__(self):
         return len(self.images_df)
 
@@ -218,7 +225,7 @@ class GRAZPEDWRIDataset(Dataset):
 
         image = Image.open(image_path).convert('RGB')
         image = np.array(image)
-        
+
         if self.transform:
             transformed = self.transform(image=image, bboxes=boxes, class_labels=class_labels)
             image = transformed['image']
