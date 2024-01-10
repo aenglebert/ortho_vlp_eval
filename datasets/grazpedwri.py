@@ -2,6 +2,7 @@ import yaml
 from tqdm import tqdm
 from pathlib import Path
 import cv2
+from PIL import Image
 import numpy as np
 import pandas as pd
 
@@ -45,6 +46,118 @@ class GRAZPEDWRICollate:
             output_dict["attention_mask"] = class_tokenized["attention_mask"]
 
         return output_dict
+
+
+class ClassificationGRAZPEDWRIDataset(Dataset):
+    def __init__(self,
+                 data_dir,
+                 csv_file="dataset.csv",
+                 transform=None,
+                 ):
+        super().__init__()
+
+        self.data_dir = Path(data_dir)
+
+        self.images_df = pd.read_csv(self.data_dir / csv_file).fillna(0)
+
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.images_df)
+
+    def __getitem__(self, idx):
+        image_row = self.images_df.iloc[idx]
+
+        labels = [image_row.cast,
+                  image_row.osteopenia,
+                  image_row.fracture_visible,
+                  image_row.metal,
+                  ]
+        labels = torch.tensor(labels, dtype=torch.long)
+
+        key = image_row.filestem
+        image_path = self.data_dir / "images" / (key + ".png")
+
+        image = Image.open(image_path).convert('RGB')
+        image = np.array(image)
+#        image = cv2.imread(str(image_path))
+#        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+#        image = image.astype(np.float32)
+
+#        image = image / 255
+
+        if self.transform:
+            transformed = self.transform(image=image)
+            image = transformed['image']
+
+        # image = Image.open(image_path)
+
+        return {"images": image,
+                "labels": labels,
+                }
+
+
+class ClassificationGRAZPEDWRIDataModule(LightningDataModule):
+    def __init__(self,
+                 data_dir,
+                 batch_size=32,
+                 num_workers=0,
+                 train_ratio=1.0,
+                 train_transform=None,
+                 test_transform=None,
+                 ):
+        super().__init__()
+
+        self.data_dir = data_dir
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.train_ratio = train_ratio
+        self.train_transform = train_transform
+        self.test_transform = test_transform
+        self.n_classes = 4
+
+        self.train_dataset = None
+        self.val_dataset = None
+        self.test_dataset = None
+
+    def setup(self, stage=None):
+        self.train_dataset = ClassificationGRAZPEDWRIDataset(self.data_dir,
+                                                             csv_file="train_dataset.csv",
+                                                             transform=self.train_transform,
+                                                             )
+        if self.train_ratio < 1.0:
+            train_size = len(self.train_dataset)
+            train_indices = np.arange(train_size)
+            np.random.shuffle(train_indices)
+            train_indices = train_indices[:int(train_size * self.train_ratio)]
+            self.train_dataset = torch.utils.data.Subset(self.train_dataset, train_indices)
+
+        self.val_dataset = ClassificationGRAZPEDWRIDataset(self.data_dir,
+                                                           csv_file="val_dataset.csv",
+                                                           transform=self.test_transform,
+                                                           )
+        self.test_dataset = ClassificationGRAZPEDWRIDataset(self.data_dir,
+                                                            csv_file="test_dataset.csv",
+                                                            transform=self.test_transform,
+                                                            )
+
+    def train_dataloader(self):
+        return torch.utils.data.DataLoader(self.train_dataset,
+                                           batch_size=self.batch_size,
+                                           num_workers=self.num_workers,
+                                           )
+
+    def val_dataloader(self):
+        return torch.utils.data.DataLoader(self.val_dataset,
+                                           batch_size=self.batch_size,
+                                           num_workers=self.num_workers,
+                                           )
+
+    def test_dataloader(self):
+        return torch.utils.data.DataLoader(self.test_dataset,
+                                           batch_size=self.batch_size,
+                                           num_workers=self.num_workers,
+                                           )
 
 
 class GRAZPEDWRIDataset(Dataset):
