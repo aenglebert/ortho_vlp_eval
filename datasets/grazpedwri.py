@@ -216,12 +216,9 @@ class GRAZPEDWRIDataset(Dataset):
 
         class_labels, boxes = self.labels_dict[key]
 
-        image = cv2.imread(str(image_path))
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = image.astype(np.float32)
-
-        image = image / 255
-
+        image = Image.open(image_path).convert('RGB')
+        image = np.array(image)
+        
         if self.transform:
             transformed = self.transform(image=image, bboxes=boxes, class_labels=class_labels)
             image = transformed['image']
