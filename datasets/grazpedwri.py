@@ -36,11 +36,15 @@ class GRAZPEDWRICollate:
                            "boxes": torch.tensor(batch_item["boxes"], dtype=torch.float),
                            })
 
-        return {"pixel_values": images,
-                "input_ids": class_tokenized["input_ids"] if self.tokenizer is not None else None,
-                "attention_mask": class_tokenized["attention_mask"] if self.tokenizer is not None else None,
-                "labels": labels,
-                }
+        output_dict = {"pixel_values": images,
+                       "labels": labels,
+                       }
+
+        if self.tokenizer is not None:
+            output_dict["input_ids"] = class_tokenized["input_ids"]
+            output_dict["attention_mask"] = class_tokenized["attention_mask"]
+
+        return output_dict
 
 
 class GRAZPEDWRIDataset(Dataset):

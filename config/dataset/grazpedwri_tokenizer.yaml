@@ -3,6 +3,9 @@ _args_:
   - "GRAZPEDWRI-DX"
 num_workers: ${num_workers}
 batch_size: ${batch_size}
+tokenizer:
+  _target_: transformers.AutoTokenizer.from_pretrained
+  _args_: ${detection_model._args_.0.text_model._args_}
 classname_list:
   - "anomalie osseuse"
   - "lésion osseuse"

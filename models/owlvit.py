@@ -281,6 +281,8 @@ class XRSOwlViTForObjectDetection(OwlViTForObjectDetection):
         self.layer_norm = nn.LayerNorm(owlvit_config.vision_config.projection_size, eps=owlvit_config.vision_config.layer_norm_eps)
         self.sigmoid = nn.Sigmoid()
 
+        self.no_class_token = nn.Parameter(torch.zeros(owlvit_config.vision_config.projection_size))
+
     @classmethod
     def from_pretrained(
         cls,
@@ -365,7 +367,7 @@ class XRSOwlViTForObjectDetection(OwlViTForObjectDetection):
         # Apply post_layernorm to last_hidden_state, return non-projected output
         last_hidden_state = vision_outputs.last_hidden_state
         image_embeds = self.owlvit.vision_model.projection(last_hidden_state)
-        #image_embeds = self.owlvit.vision_model.post_layernorm(last_hidden_state)
+        image_embeds = self.owlvit.vision_model.post_layernorm(last_hidden_state)
 
         # Resize class token
         new_size = tuple(np.array(image_embeds.shape) - np.array((0, 1, 0)))
@@ -488,12 +490,16 @@ class XRSOwlViTForObjectDetection(OwlViTForObjectDetection):
         image_feats = torch.reshape(feature_map, (batch_size, num_patches * num_patches, hidden_dim))
 
         # Reshape from [batch_size * max_text_queries, hidden_dim] -> [batch_size, max_text_queries, hidden_dim]
-        max_text_queries = input_ids.shape[0] // batch_size
+        max_text_queries = input_ids.shape[0] // feature_map.shape[0]
         query_embeds = query_embeds.reshape(batch_size, max_text_queries, query_embeds.shape[-1])
 
+        # concat no_class_token to query_embeds
+        no_class_token = self.no_class_token.unsqueeze(0).repeat(query_embeds.shape[0], 1, 1)
+        query_embeds = torch.cat((no_class_token, query_embeds), dim=1)
+
         # If first token is 0, then this is a padded query [batch_size, num_queries].
-        input_ids = input_ids.reshape(batch_size, max_text_queries, input_ids.shape[-1])
-        query_mask = input_ids[..., 0] > 0
+        #input_ids = input_ids.reshape(batch_size, max_text_queries, input_ids.shape[-1])
+        query_mask = torch.ones(query_embeds.shape[:2], dtype=torch.bool, device=query_embeds.device)
 
         # Predict object classes [batch_size, num_patches, num_queries+1]
         (pred_logits, class_embeds) = self.class_predictor(image_feats, query_embeds, query_mask)
@@ -513,7 +519,7 @@ class XRSOwlViTForObjectDetection(OwlViTForObjectDetection):
             losses = ["labels", "boxes", "cardinality"]
             criterion = DetrLoss(
                 matcher=matcher,
-                num_classes=max_text_queries-1,
+                num_classes=max_text_queries,
                 eos_coef=0.1,
                 losses=losses,
             )
