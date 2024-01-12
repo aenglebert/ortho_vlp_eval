@@ -3,6 +3,7 @@ import numpy as np
 import torch
 
 import torchmetrics
+from torchmetrics.classification import MultilabelAUROC, MultilabelAccuracy
 
 from pytorch_lightning import LightningModule
 
@@ -63,6 +64,7 @@ class ClassificationEncoder(LightningModule):
                  classifier_learning_rate=1e-4,
                  encoder_learning_rate=1e-6,
                  weight_decay=1e-6,
+                 pos_weight=None,
                  ):
         """
         Args:
@@ -85,20 +87,22 @@ class ClassificationEncoder(LightningModule):
         assert isinstance(n_classes, int), "n_classes should be an integer"
         assert n_classes >= 1, "n_classes should be equal or greater than 1"
 
-        if n_classes == 1:
-            # Use BCE loss
-            self.loss = torch.nn.BCEWithLogitsLoss()
-            task = "binary"
-        else:
-            # Use cross entropy loss
-            self.loss = torch.nn.CrossEntropyLoss()
-            task = "multiclass"
+        # Use BCE loss
+        self.loss = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        task = "binary"
 
-        self.train_acc = torchmetrics.Accuracy(task=task)
-        self.val_acc = torchmetrics.Accuracy(task=task)
-        self.test_acc = torchmetrics.Accuracy(task=task)
-        self.val_auroc = BinaryAUROC()
-        self.test_auroc = BinaryAUROC()
+        if n_classes == 1:
+            self.train_acc = torchmetrics.Accuracy(task=task)
+            self.val_acc = torchmetrics.Accuracy(task=task)
+            self.test_acc = torchmetrics.Accuracy(task=task)
+            self.val_auroc = BinaryAUROC()
+            self.test_auroc = BinaryAUROC()
+        else:
+            self.train_acc = MultilabelAccuracy(num_labels=n_classes, average=None)
+            self.val_acc = MultilabelAccuracy(num_labels=n_classes, average=None)
+            self.test_acc = MultilabelAccuracy(num_labels=n_classes, average=None)
+            self.val_auroc = MultilabelAUROC(num_labels=n_classes, average=None)
+            self.test_auroc = MultilabelAUROC(num_labels=n_classes, average=None)
 
         self.freeze_encoder = freeze_encoder
 
@@ -106,7 +110,10 @@ class ClassificationEncoder(LightningModule):
 
     def common_step(self, batch, pool_image=False):
         images = batch["images"]
-        labels = batch["labels"].unsqueeze(-1)
+        labels = batch["labels"]
+
+        if labels.ndim == 1:
+            labels = labels.unsqueeze(-1)
 
         if "pooling_matrix" in batch.keys() and batch["pooling_matrix"] is not None:
             pooling_matrix = batch["pooling_matrix"]
@@ -140,7 +147,7 @@ class ClassificationEncoder(LightningModule):
 
         logits = self.classifier(image_embeds)
 
-        loss = self.loss(logits, labels)
+        loss = self.loss(logits, labels.float())
 
         batch_size = labels.shape[0]
 
@@ -148,20 +155,36 @@ class ClassificationEncoder(LightningModule):
 
         self.train_acc(logits, labels)
 
-        self.log('train/acc', self.test_acc, on_step=True, on_epoch=True, batch_size=batch_size)
+        # Log acc on step and epoch, if multilabel, log for each class
+        #if self.hparams.n_classes == 1:
+        #    self.log('train/acc', self.train_acc, on_step=True, on_epoch=True, batch_size=batch_size)
+        #else:
+        #    for i in range(self.hparams.n_classes):
+        #        self.log(f'train/acc_{i}', self.train_acc[i], on_step=True, on_epoch=True, batch_size=batch_size)
 
         return loss
+
+    def on_train_epoch_end(self):
+        acc = self.train_acc.compute()
+
+        # Log acc on step and epoch, if multilabel, log for each class
+        if self.hparams.n_classes == 1:
+            self.log('train/acc', acc, on_epoch=True)
+        else:
+            for i in range(self.hparams.n_classes):
+                self.log(f'train/acc_{i}', acc[i], on_epoch=True)
 
     def validation_step(self, batch, batch_idx):
         image_embeds, labels = self.common_step(batch, pool_image=self.pool_image)
 
         logits = self.classifier(image_embeds)
 
-        loss = self.loss(logits, labels)
+        loss = self.loss(logits, labels.float())
 
         batch_size = labels.shape[0]
 
         self.log('val/loss', loss, batch_size=batch_size)
+
         self.val_acc(logits, labels)
         self.val_auroc(torch.sigmoid(logits), labels)
 
@@ -169,8 +192,15 @@ class ClassificationEncoder(LightningModule):
 
     def on_validation_epoch_end(self):
         auroc = self.val_auroc.compute()
-        self.log('val/auroc_epoch', auroc)
-        self.log('val/acc_epoch', self.val_acc.compute())
+
+        # Log acc and auroc on step and epoch, if multilabel, log for each class
+        if self.hparams.n_classes == 1:
+            self.log('val/acc', self.val_acc.compute(), on_epoch=True)
+            self.log('val/auroc', auroc, on_epoch=True)
+        else:
+            for i in range(self.hparams.n_classes):
+                self.log(f'val/acc_{i}', self.val_acc[i].compute(), on_epoch=True)
+                self.log(f'val/auroc_{i}', auroc[i], on_epoch=True)
 
     def test_step(self, batch, batch_idx):
         # At test time, always pool the images (evaluating the model on the whole study)
@@ -178,7 +208,7 @@ class ClassificationEncoder(LightningModule):
 
         logits = self.classifier(image_embeds)
 
-        loss = self.loss(logits, labels)
+        loss = self.loss(logits, labels.float())
 
         batch_size = labels.shape[0]
 
@@ -192,8 +222,15 @@ class ClassificationEncoder(LightningModule):
 
     def on_test_epoch_end(self):
         auroc = self.test_auroc.compute()
-        self.log('test/auroc_epoch', auroc)
-        self.log('test/acc_epoch', self.test_acc.compute())
+
+        # Log acc and auroc on step and epoch, if multilabel, log for each class
+        if self.hparams.n_classes == 1:
+            self.log('test/auroc', auroc)
+            self.log('test/acc', self.test_acc.compute())
+        else:
+            for i in range(self.hparams.n_classes):
+                self.log(f'test/auroc_{i}', auroc[i])
+                self.log(f'test/acc_{i}', self.test_acc[i].compute())
 
     def configure_optimizers(self):
 
