@@ -63,10 +63,10 @@ class ClassificationGRAZPEDWRIDataset(Dataset):
         self.transform = transform
 
         self.pos_weight = torch.tensor([
-            (len(self.images_df) - self.images_df.cast.sum()) / len(self.images_df),
-            (len(self.images_df) - self.images_df.osteopenia.sum()) / len(self.images_df),
-            (len(self.images_df) - self.images_df.fracture_visible.sum()) / len(self.images_df),
-            (len(self.images_df) - self.images_df.metal.sum()) / len(self.images_df),
+            (len(self.images_df) - self.images_df.cast.sum()) / self.images_df.cast.sum(),
+            (len(self.images_df) - self.images_df.osteopenia.sum()) / self.images_df.osteopenia.sum(),
+            (len(self.images_df) - self.images_df.fracture_visible.sum()) / self.images_df.fracture_visible.sum(),
+            (len(self.images_df) - self.images_df.metal.sum()) / self.images_df.metal.sum(),
             ], dtype=torch.float32)
 
     def __len__(self):
@@ -147,6 +147,9 @@ class ClassificationGRAZPEDWRIDataModule(LightningDataModule):
                                                             csv_file="test_dataset.csv",
                                                             transform=self.test_transform,
                                                             )
+
+    def get_pos_weight(self):
+        return self.train_dataset.pos_weight
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(self.train_dataset,

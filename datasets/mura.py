@@ -115,6 +115,12 @@ class MURADataset(Dataset):
             # add the list of current study images paths to global list of list
             self.studies_path.append(cur_study_images_path)
 
+        # Compute pos_weight for BCEWithLogitsLoss
+        if study_level:
+            self.pos_weight = torch.tensor((len(self.studies_label) - sum(self.studies_label)) / sum(self.studies_label))
+        else:
+            self.pos_weight = torch.tensor((len(self.images_label) - sum(self.images_label)) / sum(self.images_label))
+
         self.studies_label = torch.tensor(self.studies_label)
         self.n_pos_studies = torch.sum(self.studies_label).item()
         self.images_label = torch.tensor(self.images_label)
@@ -240,6 +246,9 @@ class MURADataModule(LightningDataModule):
                                             study_level=True,
                                             transform=self.test_transform,
                                             )
+
+    def get_pos_weight(self):
+        return self.train_dataset.dataset.pos_weight
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(self.train_dataset,
