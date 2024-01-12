@@ -21,4 +21,4 @@ weight_decay: 1e-6
 freeze_encoder: ${eval_type.freeze_encoder}
 
 project_name: vlp_classification_benchmark
-experiment_name: ${hydra:runtime.choices.vision_model}-${hydra:runtime.choices.eval_type}
+experiment_name: ${hydra:runtime.choices.vision_model}-${hydra:runtime.choices.eval_type}-${hydra:runtime.choices.dataset}
