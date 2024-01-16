@@ -127,11 +127,16 @@ class ClassificationGRAZPEDWRIDataModule(LightningDataModule):
         self.val_dataset = None
         self.test_dataset = None
 
+        self.pos_weight = None
+
     def setup(self, stage=None):
         self.train_dataset = ClassificationGRAZPEDWRIDataset(self.data_dir,
                                                              csv_file="train_dataset.csv",
                                                              transform=self.train_transform,
                                                              )
+
+        self.pos_weight = self.train_dataset.pos_weight
+
         if self.train_ratio < 1.0:
             train_size = len(self.train_dataset)
             train_indices = np.arange(train_size)
@@ -149,7 +154,7 @@ class ClassificationGRAZPEDWRIDataModule(LightningDataModule):
                                                             )
 
     def get_pos_weight(self):
-        return self.train_dataset.pos_weight
+        return self.pos_weight
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(self.train_dataset,

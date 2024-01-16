@@ -213,6 +213,7 @@ class MURADataModule(LightningDataModule):
         self.test_transform = test_transform
         self.num_workers = num_workers
         self.n_classes = 1
+        self.pos_weight = None
 
         if study_level:
             #self.collate_fn = StudyCollator(8)
@@ -231,6 +232,8 @@ class MURADataModule(LightningDataModule):
                                             transform=self.train_transform,
                                             )
 
+            self.pos_weight = train_val_dataset.pos_weight
+
             train_len = int(len(train_val_dataset)*0.9)
             self.train_dataset, self.val_dataset = random_split(train_val_dataset, [train_len, len(train_val_dataset)-train_len])
 
@@ -248,7 +251,7 @@ class MURADataModule(LightningDataModule):
                                             )
 
     def get_pos_weight(self):
-        return self.train_dataset.dataset.pos_weight
+        return self.pos_weight
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(self.train_dataset,
