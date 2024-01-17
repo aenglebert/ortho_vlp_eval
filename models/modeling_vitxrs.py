@@ -28,12 +28,15 @@ class ViTXRSConfig(ViTConfig):
                  seq_model=False,
                  mask_ratio=0,
                  projection_size=512,
+                 logit_scale_init_value=2.6592,
                  **kwargs):
         super().__init__(**kwargs)
 
         self.seq_model = seq_model
         self.mask_ratio = mask_ratio
         self.projection_size = projection_size
+        self.logit_scale = logit_scale_init_value
+        self.logit_bias = -10.0
 
 
 class ViTXRSMAEConfig(ViTXRSConfig):
@@ -151,6 +154,88 @@ class GatedAttentionPool1d(nn.Module):
         return a @ x
 
 
+class ViTXRSEmbeddings(ViTEmbeddings):
+    """
+    Combination of ViTEmbeddings and ViTMAEEmbeddings
+    """
+    def __init__(self, config):
+        super().__init__(config)
+
+    def random_masking(self, sequence, noise=None):
+        """
+        Perform per-sample random masking by per-sample shuffling. Per-sample shuffling is done by argsort random
+        noise.
+        From ViTMAEEmbeddings.random_masking
+
+        Args:
+            sequence (`torch.LongTensor` of shape `(batch_size, sequence_length, dim)`)
+            noise (`torch.FloatTensor` of shape `(batch_size, sequence_length)`, *optional*) which is
+                mainly used for testing purposes to control randomness and maintain the reproducibility
+        """
+        batch_size, seq_length, dim = sequence.shape
+        len_keep = int(seq_length * (1 - self.config.mask_ratio))
+
+        if noise is None:
+            noise = torch.rand(batch_size, seq_length, device=sequence.device)  # noise in [0, 1]
+
+        # sort noise for each sample
+        ids_shuffle = torch.argsort(noise, dim=1)  # ascend: small is keep, large is remove
+        ids_restore = torch.argsort(ids_shuffle, dim=1)
+
+        # keep the first subset
+        ids_keep = ids_shuffle[:, :len_keep]
+        sequence_unmasked = torch.gather(sequence, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, dim))
+
+        # generate the binary mask: 0 is keep, 1 is remove
+        mask = torch.ones([batch_size, seq_length], device=sequence.device)
+        mask[:, :len_keep] = 0
+        # unshuffle to get the binary mask
+        mask = torch.gather(mask, dim=1, index=ids_restore)
+
+        return sequence_unmasked, mask, ids_restore
+
+    def forward(
+        self,
+        pixel_values: torch.Tensor,
+        bool_masked_pos: Optional[torch.BoolTensor] = None,
+        interpolate_pos_encoding: bool = False,
+        noise=None,
+    ) -> torch.Tensor:
+        batch_size, num_channels, height, width = pixel_values.shape
+        embeddings = self.patch_embeddings(pixel_values, interpolate_pos_encoding=interpolate_pos_encoding)
+
+        if bool_masked_pos is not None:
+            seq_length = embeddings.shape[1]
+            mask_tokens = self.mask_token.expand(batch_size, seq_length, -1)
+            # replace the masked visual tokens by mask_tokens
+            mask = bool_masked_pos.unsqueeze(-1).type_as(mask_tokens)
+            embeddings = embeddings * (1.0 - mask) + mask_tokens * mask
+
+        # add the [CLS] token to the embedded patch tokens
+        cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+        embeddings = torch.cat((cls_tokens, embeddings), dim=1)
+
+        # add positional encoding to each token
+        if interpolate_pos_encoding:
+            embeddings = embeddings + self.interpolate_pos_encoding(embeddings, height, width)
+        else:
+            embeddings = embeddings + self.position_embeddings
+
+        cls_tokens = embeddings[:, 0, :]
+        embeddings = embeddings[:, 1:, :]
+
+        # masking: length -> length * config.mask_ratio
+        embeddings, mask, ids_restore = self.random_masking(embeddings, noise)
+
+        # append cls token
+        cls_tokens = cls_tokens.unsqueeze(1)
+        embeddings = torch.cat((cls_tokens, embeddings), dim=1)
+
+        embeddings = self.dropout(embeddings)
+
+        return embeddings, mask, ids_restore
+
+
 class ViTXRSModel(ViTModel):
     config_class = ViTXRSConfig
 
@@ -158,7 +243,7 @@ class ViTXRSModel(ViTModel):
         super().__init__(config)
         self.config = config
 
-        self.embeddings = ViTMAEEmbeddings(config)
+        self.embeddings = ViTXRSEmbeddings(config)
         self.encoder = ViTMAEEncoder(config)
 
         self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
@@ -166,6 +251,9 @@ class ViTXRSModel(ViTModel):
         self.pooler = GatedAttentionPool1d(config) if config.seq_model else None
 
         self.projection = nn.Linear(config.hidden_size, config.projection_size)
+
+        self.logit_scale = nn.Parameter(torch.tensor(self.config.logit_scale))
+        self.logit_bias = nn.Parameter(torch.tensor(self.config.logit_bias))
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -201,7 +289,7 @@ class ViTXRSModel(ViTModel):
         if pixel_values.dtype != expected_dtype:
             pixel_values = pixel_values.to(expected_dtype)
 
-        embedding_output, mask, ids_restore = self.embeddings(pixel_values)
+        embedding_output, mask, ids_restore = self.embeddings(pixel_values, interpolate_pos_encoding=True)
 
         encoder_outputs = self.encoder(
             embedding_output,
