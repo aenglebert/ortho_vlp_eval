@@ -14,6 +14,8 @@ class RegressionEncoder(LightningModule):
                  pool_image=False,
                  freeze_encoder=0,
                  dropout=0.2,
+                 scale=100,
+                 bias=0,
                  head_learning_rate=1e-4,
                  encoder_learning_rate=1e-6,
                  weight_decay=1e-6,
@@ -33,6 +35,8 @@ class RegressionEncoder(LightningModule):
         self.vision_model = vision_model
         self.dropout = torch.nn.Dropout(dropout)
         self.head = torch.nn.Linear(vision_model.config.hidden_size, 1)
+        self.scale = torch.nn.Parameter(torch.tensor(scale))
+        self.bias = torch.nn.Parameter(torch.tensor(bias))
 
         # Use MSE loss for regression
         #self.loss = torch.nn.MSELoss()
@@ -72,7 +76,7 @@ class RegressionEncoder(LightningModule):
 
         image_embeds = self.dropout(image_embeds)
 
-        logits = self.head(image_embeds)
+        logits = self.head(image_embeds) * self.scale + self.bias
 
         loss = self.loss(logits, targets.float())
 
@@ -95,7 +99,7 @@ class RegressionEncoder(LightningModule):
     def validation_step(self, batch, batch_idx):
         image_embeds, targets = self.common_step(batch)
 
-        logits = self.head(image_embeds)
+        logits = self.head(image_embeds) * self.scale + self.bias
 
         loss = self.loss(logits, targets.float())
 
@@ -119,7 +123,7 @@ class RegressionEncoder(LightningModule):
         # At test time, always pool the images (evaluating the model on the whole study)
         image_embeds, targets = self.common_step(batch)
 
-        logits = self.head(image_embeds)
+        logits = self.head(image_embeds) * self.scale + self.bias
 
         loss = self.loss(logits, targets.float())
 

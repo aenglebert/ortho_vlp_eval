@@ -42,6 +42,10 @@ class RSNABoneAge(Dataset):
 
         self.transform = transform
 
+        # Compute mean and std of the dataset
+        self.mean = np.mean([data['boneage'] for data in self.data_list])
+        self.std = np.std([data['boneage'] for data in self.data_list])
+
     def __len__(self):
         return len(self.data_list)
 
@@ -86,10 +90,16 @@ class RSNABoneAgeDataModule(LightningDataModule):
         self.val_dataset = None
         self.test_dataset = None
 
+        self.mean = None
+        self.std = None
+
     def setup(self, stage=None):
         train_val_dataset = RSNABoneAge(images_dir_list=self.train_images_dir_list,
                                         csv_path=self.train_csv_path,
                                         transform=self.train_transform)
+
+        self.mean = train_val_dataset.mean
+        self.std = train_val_dataset.std
 
         # Split the train_val_dataset into train and val datasets
         train_size = int(0.9 * len(train_val_dataset))

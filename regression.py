@@ -54,6 +54,7 @@ def main(cfg: DictConfig):
 
     # Instantiate the dataset
     datamodule = instantiate(cfg.dataset)
+    datamodule.setup()
 
     # Instantiate the model
     vision_model = instantiate(cfg.vision_model)
@@ -65,6 +66,8 @@ def main(cfg: DictConfig):
                               encoder_learning_rate=cfg.encoder_learning_rate,
                               freeze_encoder=cfg.freeze_encoder,
                               weight_decay=cfg.weight_decay,
+                              scale=datamodule.std,
+                              bias=datamodule.mean,
                               )
 
     # Checkpoint callback
