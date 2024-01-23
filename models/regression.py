@@ -89,6 +89,8 @@ class RegressionEncoder(LightningModule):
     def on_train_epoch_end(self):
         self.log('train/r2', self.train_r2.compute())
         self.log('train/mad', self.train_mad.compute())
+        self.train_r2.reset()
+        self.train_mad.reset()
 
     def validation_step(self, batch, batch_idx):
         image_embeds, targets = self.common_step(batch)
@@ -110,6 +112,8 @@ class RegressionEncoder(LightningModule):
     def on_validation_epoch_end(self):
         self.log('val/r2', self.val_r2.compute())
         self.log('val/mad', self.val_mad.compute())
+        self.val_r2.reset()
+        self.val_mad.reset()
 
     def test_step(self, batch, batch_idx):
         # At test time, always pool the images (evaluating the model on the whole study)
@@ -132,6 +136,8 @@ class RegressionEncoder(LightningModule):
     def on_test_epoch_end(self):
         self.log('test/r2', self.test_r2.compute())
         self.log('test/mad', self.test_mad.compute())
+        self.test_r2.reset()
+        self.test_mad.reset()
 
     def configure_optimizers(self):
 
