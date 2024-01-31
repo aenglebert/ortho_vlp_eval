@@ -16,6 +16,7 @@ class RegressionEncoder(LightningModule):
                  dropout=0.2,
                  scale=100,
                  bias=0,
+                 target_dim=1,
                  head_learning_rate=1e-4,
                  encoder_learning_rate=1e-6,
                  weight_decay=1e-6,
@@ -34,7 +35,7 @@ class RegressionEncoder(LightningModule):
 
         self.vision_model = vision_model
         self.dropout = torch.nn.Dropout(dropout)
-        self.head = torch.nn.Linear(vision_model.config.hidden_size, 1)
+        self.head = torch.nn.Linear(vision_model.config.hidden_size, target_dim)
         self.scale = torch.nn.Parameter(torch.tensor(scale))
         self.bias = torch.nn.Parameter(torch.tensor(bias))
 
@@ -45,9 +46,9 @@ class RegressionEncoder(LightningModule):
         self.loss = torch.nn.L1Loss()
 
         # R2 score metrics
-        self.train_r2 = R2Score()
-        self.val_r2 = R2Score()
-        self.test_r2 = R2Score()
+        #self.train_r2 = R2Score()
+        #self.val_r2 = R2Score()
+        #self.test_r2 = R2Score()
 
         # MAD score metrics
         self.train_mad = MeanAbsoluteError()
@@ -85,15 +86,15 @@ class RegressionEncoder(LightningModule):
         self.log('train/loss', loss, batch_size=batch_size)
 
         # Add to metrics
-        self.train_r2(logits, targets)
+        #self.train_r2(logits, targets)
         self.train_mad(logits, targets)
 
         return loss
 
     def on_train_epoch_end(self):
-        self.log('train/r2', self.train_r2.compute())
+        #self.log('train/r2', self.train_r2.compute())
         self.log('train/mad', self.train_mad.compute())
-        self.train_r2.reset()
+        #self.train_r2.reset()
         self.train_mad.reset()
 
     def validation_step(self, batch, batch_idx):
@@ -108,15 +109,15 @@ class RegressionEncoder(LightningModule):
         self.log('val/loss', loss, batch_size=batch_size)
 
         # Add metrics
-        self.val_r2(logits, targets)
+        #self.val_r2(logits, targets)
         self.val_mad(logits, targets)
 
         return loss
 
     def on_validation_epoch_end(self):
-        self.log('val/r2', self.val_r2.compute())
+        #self.log('val/r2', self.val_r2.compute())
         self.log('val/mad', self.val_mad.compute())
-        self.val_r2.reset()
+        #self.val_r2.reset()
         self.val_mad.reset()
 
     def test_step(self, batch, batch_idx):
@@ -132,15 +133,15 @@ class RegressionEncoder(LightningModule):
         self.log('test/loss', loss, batch_size=batch_size)
 
         # Add metrics
-        self.test_r2(logits, targets)
+        #self.test_r2(logits, targets)
         self.test_mad(logits, targets)
 
         return loss
 
     def on_test_epoch_end(self):
-        self.log('test/r2', self.test_r2.compute())
+        #self.log('test/r2', self.test_r2.compute())
         self.log('test/mad', self.test_mad.compute())
-        self.test_r2.reset()
+        #self.test_r2.reset()
         self.test_mad.reset()
 
     def configure_optimizers(self):

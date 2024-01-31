@@ -92,6 +92,7 @@ class RSNABoneAgeDataModule(LightningDataModule):
 
         self.mean = None
         self.std = None
+        self.target_dim = 1
 
     def setup(self, stage=None):
         train_val_dataset = RSNABoneAge(images_dir_list=self.train_images_dir_list,

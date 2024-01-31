@@ -68,6 +68,7 @@ def main(cfg: DictConfig):
                               weight_decay=cfg.weight_decay,
                               scale=datamodule.std,
                               bias=datamodule.mean,
+                              target_dim=datamodule.target_dim,
                               )
 
     # Checkpoint callback
