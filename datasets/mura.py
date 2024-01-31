@@ -23,11 +23,14 @@ class MURAStudyCollator:
         for image_list, label in batch:
 
             images_list_of_list.append(image_list[:self.max_images])
-            seq_sizes.append(len(image_list))
+            seq_sizes.append(min(len(image_list), self.max_images))
             labels.append(label)
 
         # stack images
-        images = torch.stack([image for image_list in images_list_of_list for image in image_list], 0)
+        images = []
+        for image_list in images_list_of_list:
+            images.extend(image_list)
+        images = torch.stack(images, 0)
 
         # Create a placeholder for the pooling mapping tensor
         pooling_matrix = torch.zeros((len(seq_sizes), images.shape[0]))
