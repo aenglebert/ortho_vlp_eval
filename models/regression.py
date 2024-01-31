@@ -4,7 +4,7 @@ import torch
 
 from pytorch_lightning import LightningModule
 
-from torchmetrics import R2Score, MeanAbsoluteError
+from torchmetrics import MeanAbsoluteError
 
 
 # define the LightningModule
@@ -45,11 +45,6 @@ class RegressionEncoder(LightningModule):
         # Use MAE loss for regression
         self.loss = torch.nn.L1Loss()
 
-        # R2 score metrics
-        #self.train_r2 = R2Score()
-        #self.val_r2 = R2Score()
-        #self.test_r2 = R2Score()
-
         # MAD score metrics
         self.train_mad = MeanAbsoluteError()
         self.val_mad = MeanAbsoluteError()
@@ -86,15 +81,12 @@ class RegressionEncoder(LightningModule):
         self.log('train/loss', loss, batch_size=batch_size)
 
         # Add to metrics
-        #self.train_r2(logits, targets)
         self.train_mad(logits, targets)
 
         return loss
 
     def on_train_epoch_end(self):
-        #self.log('train/r2', self.train_r2.compute())
         self.log('train/mad', self.train_mad.compute())
-        #self.train_r2.reset()
         self.train_mad.reset()
 
     def validation_step(self, batch, batch_idx):
@@ -109,15 +101,12 @@ class RegressionEncoder(LightningModule):
         self.log('val/loss', loss, batch_size=batch_size)
 
         # Add metrics
-        #self.val_r2(logits, targets)
         self.val_mad(logits, targets)
 
         return loss
 
     def on_validation_epoch_end(self):
-        #self.log('val/r2', self.val_r2.compute())
         self.log('val/mad', self.val_mad.compute())
-        #self.val_r2.reset()
         self.val_mad.reset()
 
     def test_step(self, batch, batch_idx):
@@ -133,15 +122,12 @@ class RegressionEncoder(LightningModule):
         self.log('test/loss', loss, batch_size=batch_size)
 
         # Add metrics
-        #self.test_r2(logits, targets)
         self.test_mad(logits, targets)
 
         return loss
 
     def on_test_epoch_end(self):
-        #self.log('test/r2', self.test_r2.compute())
         self.log('test/mad', self.test_mad.compute())
-        #self.test_r2.reset()
         self.test_mad.reset()
 
     def configure_optimizers(self):
