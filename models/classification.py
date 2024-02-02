@@ -66,7 +66,10 @@ class MultiLabelClassifier(torch.nn.Module):
     def forward(self, x):
         # We assume that the input is a tensor of shape (batch_size, input_size)
         # We return a tensor of shape (batch_size, n_labels, n_classes)
-        return torch.stack([classifier(x) for classifier in self.classifier_list], dim=1)
+        logits = torch.stack([classifier(x) for classifier in self.classifier_list], dim=1)
+        if logits.shape[1] == 1:
+            logits = logits.squeeze(1)
+        return logits
 
 
 # define the LightningModule
@@ -118,18 +121,18 @@ class ClassificationEncoder(LightningModule):
         if n_classes == 1:
             # Use BCE loss
             self.loss = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-            task = "binary"
+            self.task = "binary"
         else:
             # Use cross entropy loss
             self.loss = torch.nn.CrossEntropyLoss()
-            task = "multiclass"
+            self.task = "multiclass"
 
-        self.train_acc = torchmetrics.Accuracy(task=task, num_classes=n_classes)
-        self.val_acc = torchmetrics.Accuracy(task=task, num_classes=n_classes)
-        self.test_acc = torchmetrics.Accuracy(task=task, num_classes=n_classes)
+        self.train_acc = torchmetrics.Accuracy(task=self.task, num_classes=n_classes)
+        self.val_acc = torchmetrics.Accuracy(task=self.task, num_classes=n_classes)
+        self.test_acc = torchmetrics.Accuracy(task=self.task, num_classes=n_classes)
 
-        self.val_auroc = torchmetrics.AUROC(task=task, num_classes=n_classes)
-        self.test_auroc = torchmetrics.AUROC(task=task, num_classes=n_classes)
+        self.val_auroc = torchmetrics.AUROC(task=self.task, num_classes=n_classes)
+        self.test_auroc = torchmetrics.AUROC(task=self.task, num_classes=n_classes)
 
         self.freeze_encoder = freeze_encoder
 
@@ -174,7 +177,7 @@ class ClassificationEncoder(LightningModule):
 
         logits = self.classifier(image_embeds)
 
-        if self.loss == torch.nn.BCEWithLogitsLoss:
+        if self.task == "binary":
             loss = self.loss(logits, labels.float())
         else:
             logits = logits.view(-1, self.n_classes)
@@ -207,7 +210,7 @@ class ClassificationEncoder(LightningModule):
 
         logits = self.classifier(image_embeds)
 
-        if self.loss == torch.nn.BCEWithLogitsLoss:
+        if self.task == "binary":
             loss = self.loss(logits, labels.float())
         else:
             logits = logits.view(-1, self.n_classes)
@@ -236,7 +239,7 @@ class ClassificationEncoder(LightningModule):
 
         logits = self.classifier(image_embeds)
 
-        if self.loss == torch.nn.BCEWithLogitsLoss:
+        if self.task == "binary":
             loss = self.loss(logits, labels.float())
         else:
             logits = logits.view(-1, self.n_classes)
