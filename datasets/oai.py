@@ -14,10 +14,8 @@ class OAIAlignmentDataset(Dataset):
     def __init__(self, csv_file, image_root_dir, transform=None):
         """
         :param csv_file: path to the csv file, the csv is constructed as follows:
-            ID, RHKA, LHKA, Rfemlen, Lfemlen, Rtiblen, Ltiblen, filename
-        :param image_root_dir: path to the root directory of the images (the filename column in the csv file),
-        the images are extracted from the zip file, witout any subdirectories (i.e. all the images are in the same
-        directory)
+            ID, RHKA, LHKA, Rfemlen, Lfemlen, Rtiblen, Ltiblen, file
+        :param image_root_dir: path to the root directory of the images (the file column in the csv)
         :param transform: albumentations transform to apply to the images
         """
         self.data = pd.read_csv(csv_file)
@@ -27,8 +25,6 @@ class OAIAlignmentDataset(Dataset):
         # Compute mean and std of the dataset (for the two HKA angles)
         self.mean = self.data[['RHKA', 'LHKA']].mean().values
         self.std = self.data[['RHKA', 'LHKA']].std().values
-        #self.mean = self.data[['RHKA', 'LHKA', 'Rfemlen', 'Lfemlen', 'Rtiblen', 'Ltiblen']].mean().values
-        #self.std = self.data[['RHKA', 'LHKA', 'Rfemlen', 'Lfemlen', 'Rtiblen', 'Ltiblen']].std().values
 
     def __len__(self):
         return len(self.data)
@@ -37,12 +33,11 @@ class OAIAlignmentDataset(Dataset):
         row = self.data.iloc[idx]
 
         # Read the image
-        image_path = Path(self.image_root_dir) / row.filename
+        image_path = Path(self.image_root_dir) / row.file
         image = Image.open(image_path).convert('RGB')
         image = np.array(image)
 
         # Get the labels (HKA angles)
-        #target = row[['RHKA', 'LHKA', 'Rfemlen', 'Lfemlen', 'Rtiblen', 'Ltiblen']].values.astype(np.float32)
         target = row[['RHKA', 'LHKA']].values.astype(np.float32)
 
         # Apply the transform
@@ -74,9 +69,9 @@ class OAIAlignmentDataModule(LightningDataModule):
         self.pin_memory = pin_memory
         self.train_transform = train_transform
         self.test_transform = test_transform
-        self.train_csv = Path(data_dir) / "train.csv"
-        self.val_csv = Path(data_dir) / "val.csv"
-        self.test_csv = Path(data_dir) / "test.csv"
+        self.train_csv = Path(data_dir) / "hka_train.csv"
+        self.val_csv = Path(data_dir) / "hka_val.csv"
+        self.test_csv = Path(data_dir) / "hka_test.csv"
         self.image_root_dir = Path(data_dir) / "images"
 
         self.train_dataset = None
