@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 import torchmetrics
-from torchmetrics.classification import MultilabelAUROC, MultilabelAccuracy
+from torchmetrics.classification import AUROC, Accuracy
 
 from pytorch_lightning import LightningModule
 
@@ -53,11 +53,28 @@ class BinaryAUROC:
         return auroc
 
 
+class MultiLabelClassifier(torch.nn.Module):
+    def __init__(self,
+                 input_size,
+                 n_classes,
+                 n_labels,
+                 ):
+        super().__init__()
+
+        self.classifier_list = torch.nn.ModuleList([torch.nn.Linear(input_size, n_classes) for _ in range(n_labels)])
+
+    def forward(self, x):
+        # We assume that the input is a tensor of shape (batch_size, input_size)
+        # We return a tensor of shape (batch_size, n_labels, n_classes)
+        return torch.stack([classifier(x) for classifier in self.classifier_list], dim=1)
+
+
 # define the LightningModule
 class ClassificationEncoder(LightningModule):
     def __init__(self,
                  vision_model=None,
                  n_classes=1,
+                 n_labels=1,
                  pool_image=False,
                  freeze_encoder=0,
                  dropout=0.2,
@@ -79,30 +96,40 @@ class ClassificationEncoder(LightningModule):
 
         assert vision_model is not None, "vision_model should be defined"
 
+        if n_labels is None:
+            n_labels = 1
+
         self.vision_model = vision_model
         self.dropout = torch.nn.Dropout(dropout)
-        self.classifier = torch.nn.Linear(vision_model.config.hidden_size, n_classes)
+
+        self.n_classes = n_classes
+        self.n_labels = n_labels
+
+        self.classifier = MultiLabelClassifier(self.vision_model.config.hidden_size,
+                                               n_classes,
+                                               n_labels,
+                                               )
+
         self.pool_image = pool_image
 
         assert isinstance(n_classes, int), "n_classes should be an integer"
         assert n_classes >= 1, "n_classes should be equal or greater than 1"
 
-        # Use BCE loss
-        self.loss = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-        task = "binary"
-
         if n_classes == 1:
-            self.train_acc = torchmetrics.Accuracy(task=task)
-            self.val_acc = torchmetrics.Accuracy(task=task)
-            self.test_acc = torchmetrics.Accuracy(task=task)
-            self.val_auroc = BinaryAUROC()
-            self.test_auroc = BinaryAUROC()
+            # Use BCE loss
+            self.loss = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+            task = "binary"
         else:
-            self.train_acc = MultilabelAccuracy(num_labels=n_classes, average=None)
-            self.val_acc = MultilabelAccuracy(num_labels=n_classes, average=None)
-            self.test_acc = MultilabelAccuracy(num_labels=n_classes, average=None)
-            self.val_auroc = MultilabelAUROC(num_labels=n_classes, average=None)
-            self.test_auroc = MultilabelAUROC(num_labels=n_classes, average=None)
+            # Use cross entropy loss
+            self.loss = torch.nn.CrossEntropyLoss()
+            task = "multiclass"
+
+        self.train_acc = torchmetrics.Accuracy(task=task, num_classes=n_classes)
+        self.val_acc = torchmetrics.Accuracy(task=task, num_classes=n_classes)
+        self.test_acc = torchmetrics.Accuracy(task=task, num_classes=n_classes)
+
+        self.val_auroc = torchmetrics.AUROC(task=task, num_classes=n_classes)
+        self.test_auroc = torchmetrics.AUROC(task=task, num_classes=n_classes)
 
         self.freeze_encoder = freeze_encoder
 
@@ -147,7 +174,12 @@ class ClassificationEncoder(LightningModule):
 
         logits = self.classifier(image_embeds)
 
-        loss = self.loss(logits, labels.float())
+        if self.loss == torch.nn.BCEWithLogitsLoss:
+            loss = self.loss(logits, labels.float())
+        else:
+            logits = logits.view(-1, self.n_classes)
+            labels = labels.view(-1).long()
+            loss = self.loss(logits, labels)
 
         batch_size = labels.shape[0]
 
@@ -167,19 +199,20 @@ class ClassificationEncoder(LightningModule):
     def on_train_epoch_end(self):
         acc = self.train_acc.compute()
 
-        # Log acc on step and epoch, if multilabel, log for each class
-        if self.hparams.n_classes == 1:
-            self.log('train/acc', acc, on_epoch=True)
-        else:
-            for i in range(self.hparams.n_classes):
-                self.log(f'train/acc_{i}', acc[i], on_epoch=True)
+        # Log acc on step and epoch
+        self.log('train/acc', acc, on_epoch=True)
 
     def validation_step(self, batch, batch_idx):
         image_embeds, labels = self.common_step(batch, pool_image=self.pool_image)
 
         logits = self.classifier(image_embeds)
 
-        loss = self.loss(logits, labels.float())
+        if self.loss == torch.nn.BCEWithLogitsLoss:
+            loss = self.loss(logits, labels.float())
+        else:
+            logits = logits.view(-1, self.n_classes)
+            labels = labels.view(-1).long()
+            loss = self.loss(logits, labels)
 
         batch_size = labels.shape[0]
 
@@ -193,14 +226,9 @@ class ClassificationEncoder(LightningModule):
     def on_validation_epoch_end(self):
         auroc = self.val_auroc.compute()
 
-        # Log acc and auroc on step and epoch, if multilabel, log for each class
-        if self.hparams.n_classes == 1:
-            self.log('val/acc', self.val_acc.compute(), on_epoch=True)
-            self.log('val/auroc', auroc, on_epoch=True)
-        else:
-            for i in range(self.hparams.n_classes):
-                self.log(f'val/acc_{i}', self.val_acc[i].compute(), on_epoch=True)
-                self.log(f'val/auroc_{i}', auroc[i], on_epoch=True)
+        # Log acc and auroc on step and epoch
+        self.log('val/acc', self.val_acc.compute(), on_epoch=True)
+        self.log('val/auroc', auroc, on_epoch=True)
 
     def test_step(self, batch, batch_idx):
         # At test time, always pool the images (evaluating the model on the whole study)
@@ -208,7 +236,12 @@ class ClassificationEncoder(LightningModule):
 
         logits = self.classifier(image_embeds)
 
-        loss = self.loss(logits, labels.float())
+        if self.loss == torch.nn.BCEWithLogitsLoss:
+            loss = self.loss(logits, labels.float())
+        else:
+            logits = logits.view(-1, self.n_classes)
+            labels = labels.view(-1).long()
+            loss = self.loss(logits, labels)
 
         batch_size = labels.shape[0]
 
@@ -223,14 +256,9 @@ class ClassificationEncoder(LightningModule):
     def on_test_epoch_end(self):
         auroc = self.test_auroc.compute()
 
-        # Log acc and auroc on step and epoch, if multilabel, log for each class
-        if self.hparams.n_classes == 1:
-            self.log('test/auroc', auroc)
-            self.log('test/acc', self.test_acc.compute())
-        else:
-            for i in range(self.hparams.n_classes):
-                self.log(f'test/auroc_{i}', auroc[i])
-                self.log(f'test/acc_{i}', self.test_acc[i].compute())
+        # Log acc and auroc on step and epoch
+        self.log('test/auroc', auroc)
+        self.log('test/acc', self.test_acc.compute())
 
     def configure_optimizers(self):
 

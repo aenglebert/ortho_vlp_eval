@@ -61,7 +61,8 @@ def main(cfg: DictConfig):
 
     # Create the classifier
     classifier = ClassificationEncoder(vision_model=vision_model,
-                                       n_classes=datamodule.n_classes,
+                                       n_classes=datamodule.n_classes if hasattr(datamodule, "n_classes") else 1,
+                                       n_labels=datamodule.n_labels if hasattr(datamodule, "n_labels") else 1,
                                        pool_image=cfg.pool_image,
                                        dropout=cfg.classifier_dropout,
                                        classifier_learning_rate=cfg.classifier_learning_rate,
