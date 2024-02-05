@@ -43,7 +43,7 @@ class RegressionEncoder(LightningModule):
         #self.loss = torch.nn.MSELoss()
 
         # Use MAE loss for regression
-        self.loss = torch.nn.L1Loss()
+        self.loss = torch.nn.SmoothL1Loss()
 
         # MAD score metrics
         self.train_mad = MeanAbsoluteError()
