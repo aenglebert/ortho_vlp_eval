@@ -134,6 +134,9 @@ class ClassificationEncoder(LightningModule):
         self.val_auroc = torchmetrics.AUROC(task=self.task, num_classes=n_classes)
         self.test_auroc = torchmetrics.AUROC(task=self.task, num_classes=n_classes)
 
+        self.val_f1 = torchmetrics.F1Score(task=self.task, num_classes=n_classes)
+        self.test_f1 = torchmetrics.F1Score(task=self.task, num_classes=n_classes)
+
         self.freeze_encoder = freeze_encoder
 
         self.save_hyperparameters(ignore=["vision_model"])
@@ -222,16 +225,24 @@ class ClassificationEncoder(LightningModule):
         self.log('val/loss', loss, batch_size=batch_size)
 
         self.val_acc(logits, labels)
-        self.val_auroc(torch.sigmoid(logits), labels)
+        if self.task == "binary":
+            self.val_auroc(torch.sigmoid(logits), labels)
+            self.val_f1(torch.sigmoid(logits), labels)
+        else:
+            self.val_auroc(torch.softmax(logits, dim=-1), labels)
+            self.val_f1(torch.softmax(logits, dim=-1), labels)
 
         return loss
 
     def on_validation_epoch_end(self):
-        auroc = self.val_auroc.compute()
-
         # Log acc and auroc on step and epoch
         self.log('val/acc', self.val_acc.compute(), on_epoch=True)
-        self.log('val/auroc', auroc, on_epoch=True)
+        self.log('val/auroc', self.val_auroc.compute(), on_epoch=True)
+        self.log('val/f1', self.val_f1.compute(), on_epoch=True)
+
+        self.val_acc.reset()
+        self.val_auroc.reset()
+        self.val_f1.reset()
 
     def test_step(self, batch, batch_idx):
         # At test time, always pool the images (evaluating the model on the whole study)
@@ -252,16 +263,24 @@ class ClassificationEncoder(LightningModule):
 
         self.test_acc(logits, labels)
 
-        self.test_auroc(logits, labels)
+        if self.task == "binary":
+            self.test_auroc(torch.sigmoid(logits), labels)
+            self.test_f1(torch.sigmoid(logits), labels)
+        else:
+            self.test_auroc(torch.softmax(logits, dim=-1), labels)
+            self.test_f1(torch.softmax(logits, dim=-1), labels)
 
         return loss
 
     def on_test_epoch_end(self):
-        auroc = self.test_auroc.compute()
-
-        # Log acc and auroc on step and epoch
-        self.log('test/auroc', auroc)
+        # Log acc and auroc after the test epoch
         self.log('test/acc', self.test_acc.compute())
+        self.log('test/auroc', self.test_auroc.compute())
+        self.log('test/f1', self.test_f1.compute())
+
+        self.test_acc.reset()
+        self.test_auroc.reset()
+        self.test_f1.reset()
 
     def configure_optimizers(self):
 
