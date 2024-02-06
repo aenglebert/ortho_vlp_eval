@@ -91,6 +91,10 @@ class OAIAlignmentDataModule(LightningDataModule):
                                                  image_root_dir=self.image_root_dir,
                                                  transform=self.train_transform)
 
+        # Compute mean and std
+        self.mean = self.train_dataset.mean
+        self.std = self.train_dataset.std
+
         if self.train_ratio < 1:
             # split train_dataset to keep only train_ratio of the dataset
             train_size = int(self.train_ratio * len(self.train_dataset))
@@ -105,9 +109,6 @@ class OAIAlignmentDataModule(LightningDataModule):
                                                 image_root_dir=self.image_root_dir,
                                                 transform=self.test_transform)
 
-        # Compute mean and std
-        self.mean = self.train_dataset.mean
-        self.std = self.train_dataset.std
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset,
