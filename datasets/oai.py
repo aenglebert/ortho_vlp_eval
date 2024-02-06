@@ -56,7 +56,7 @@ class OAIAlignmentDataModule(LightningDataModule):
                  batch_size=32,
                  num_workers=4,
                  train_ratio=1.0,
-                 pin_memory=True,
+                 pin_memory=False,
                  train_transform=None,
                  test_transform=None,
                  ):
@@ -183,7 +183,7 @@ class OAIKLDataModule(LightningDataModule):
                  batch_size=32,
                  num_workers=4,
                  train_ratio=1.0,
-                 pin_memory=True,
+                 pin_memory=False,
                  train_transform=None,
                  test_transform=None,
                  ):
