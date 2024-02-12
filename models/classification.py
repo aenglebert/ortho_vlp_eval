@@ -204,6 +204,7 @@ class ClassificationEncoder(LightningModule):
 
     def on_train_epoch_end(self):
         acc = self.train_acc.compute()
+        self.train_acc.reset()
 
         # Log acc on step and epoch
         self.log('train/acc', acc, on_epoch=True)
