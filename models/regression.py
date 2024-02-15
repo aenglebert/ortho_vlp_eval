@@ -17,6 +17,7 @@ class RegressionEncoder(LightningModule):
                  scale=100,
                  bias=0,
                  target_dim=1,
+                 head_additional_dim=0,
                  head_learning_rate=1e-4,
                  encoder_learning_rate=1e-6,
                  weight_decay=1e-6,
@@ -35,7 +36,8 @@ class RegressionEncoder(LightningModule):
 
         self.vision_model = vision_model
         self.dropout = torch.nn.Dropout(dropout)
-        self.head = torch.nn.Linear(vision_model.config.hidden_size, target_dim)
+        self.head = torch.nn.Linear(vision_model.config.hidden_size + head_additional_dim,
+                                    target_dim)
         self.scale = torch.nn.Parameter(torch.tensor(scale))
         self.bias = torch.nn.Parameter(torch.tensor(bias))
 
@@ -64,6 +66,12 @@ class RegressionEncoder(LightningModule):
         vision_outputs = self.vision_model(images)
 
         image_embeds = vision_outputs.last_hidden_state[:, 0, :]
+
+        if "head_input" in batch:
+            head_input = batch["head_input"]
+            if head_input.dim() == 1:
+                head_input = head_input.unsqueeze(-1)
+            image_embeds = torch.cat([image_embeds, head_input], dim=1)
 
         return image_embeds, targets
 

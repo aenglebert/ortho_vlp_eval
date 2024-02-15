@@ -69,6 +69,7 @@ def main(cfg: DictConfig):
                               scale=datamodule.std,
                               bias=datamodule.mean,
                               target_dim=datamodule.target_dim,
+                              head_additional_dim=datamodule.head_input_dim,
                               )
 
     # Checkpoint callback

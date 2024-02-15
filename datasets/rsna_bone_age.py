@@ -13,6 +13,7 @@ class RSNABoneAge(Dataset):
     def __init__(self,
                  images_dir_list,
                  csv_path,
+                 sex_input=False,
                  transform=None):
 
         # if images_path_list is a string, convert it to a list
@@ -46,6 +47,8 @@ class RSNABoneAge(Dataset):
         self.mean = np.mean([data['boneage'] for data in self.data_list])
         self.std = np.std([data['boneage'] for data in self.data_list])
 
+        self.sex_input = sex_input
+
     def __len__(self):
         return len(self.data_list)
 
@@ -57,10 +60,13 @@ class RSNABoneAge(Dataset):
         if self.transform:
             image = self.transform(image=np.array(image))['image']
 
-        return {
+        return_dict =  {
             'image': image,
             'target': data['boneage'],
         }
+        if self.sex_input:
+            return_dict['head_input'] = 1 * np.array(data["male"])
+        return return_dict
 
 
 class RSNABoneAgeDataModule(LightningDataModule):
@@ -69,6 +75,7 @@ class RSNABoneAgeDataModule(LightningDataModule):
                  train_ratio=1.0,
                  train_transform=None,
                  test_transform=None,
+                 sex_input=False,
                  batch_size=32,
                  num_workers=8,
                  ):
@@ -93,11 +100,15 @@ class RSNABoneAgeDataModule(LightningDataModule):
         self.mean = None
         self.std = None
         self.target_dim = 1
+        self.sex_input = sex_input
+        self.head_input_dim = 1 if sex_input else 0
 
     def setup(self, stage=None):
         train_val_dataset = RSNABoneAge(images_dir_list=self.train_images_dir_list,
                                         csv_path=self.train_csv_path,
-                                        transform=self.train_transform)
+                                        transform=self.train_transform,
+                                        sex_input=self.sex_input,
+                                        )
 
         self.mean = train_val_dataset.mean
         self.std = train_val_dataset.std
@@ -117,7 +128,9 @@ class RSNABoneAgeDataModule(LightningDataModule):
 
         self.test_dataset = RSNABoneAge(images_dir_list=self.test_images_dir_list,
                                         csv_path=self.test_csv_path,
-                                        transform=self.test_transform)
+                                        transform=self.test_transform,
+                                        sex_input=self.sex_input,
+                                        )
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset,
