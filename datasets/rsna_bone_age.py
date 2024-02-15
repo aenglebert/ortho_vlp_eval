@@ -138,7 +138,7 @@ class RSNABoneAgeDataModule(LightningDataModule):
                           shuffle=True,
                           num_workers=self.num_workers,
                           drop_last=True,
-                          pin_memory=True,
+                          pin_memory=False,
                           )
 
     def val_dataloader(self):
@@ -147,7 +147,7 @@ class RSNABoneAgeDataModule(LightningDataModule):
                           shuffle=False,
                           num_workers=self.num_workers,
                           drop_last=False,
-                          pin_memory=True,
+                          pin_memory=False,
                           )
 
     def test_dataloader(self):
@@ -156,5 +156,5 @@ class RSNABoneAgeDataModule(LightningDataModule):
                           shuffle=False,
                           num_workers=self.num_workers,
                           drop_last=False,
-                          pin_memory=True,
+                          pin_memory=False,
                           )
