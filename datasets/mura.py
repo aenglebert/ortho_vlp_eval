@@ -261,7 +261,7 @@ class MURADataModule(LightningDataModule):
                                            batch_size=self.batch_size,
                                            shuffle=True,
                                            num_workers=self.num_workers,
-                                           pin_memory=True,
+                                           pin_memory=False,
                                            collate_fn=self.collate_fn,
                                            )
 
@@ -270,7 +270,7 @@ class MURADataModule(LightningDataModule):
                                            batch_size=self.batch_size,
                                            shuffle=False,
                                            num_workers=self.num_workers,
-                                           pin_memory=True,
+                                           pin_memory=False,
                                            collate_fn=self.collate_fn,
                                            )
 
@@ -279,6 +279,6 @@ class MURADataModule(LightningDataModule):
                                            batch_size=self.batch_size,
                                            shuffle=False,
                                            num_workers=self.num_workers,
-                                           pin_memory=True,
+                                           pin_memory=False,
                                            collate_fn=MURAStudyCollator(12),
                                            )
