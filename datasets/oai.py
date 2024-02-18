@@ -81,6 +81,7 @@ class OAIAlignmentDataModule(LightningDataModule):
         self.mean = None
         self.std = None
         self.target_dim = 2
+        self.head_input_dim = 0
 
     def prepare_data(self):
         pass
