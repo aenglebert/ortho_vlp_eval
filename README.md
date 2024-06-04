@@ -1,6 +1,4 @@
-# Evaluation scripts for "Self-supervised Vision-Language Deep Learning for Bone Radiography Analysis"
-
-(preprint available soon)
+# Evaluation scripts for "Self-supervised vision-langage alignment of deep learning representations for bone X-rays analysis"
 
 ## Installation
 
@@ -15,6 +13,8 @@ It uses the following datasets:
 - MURA
 - FracAtlas
 - OAI
+
+You can find pretrained models from the paper [here](https://orthovlp.aenglecloud.com/)
 
 ## Classification
 
